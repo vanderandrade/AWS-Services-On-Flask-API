@@ -1,7 +1,11 @@
 import enum
 import logging
 import boto3
-from botocore.exceptions import ClientError
+import botocore.exceptions
+import hmac
+import hashlib
+import base64
+import json
 
 class Action(enum.Enum):
    stop = 0
@@ -10,7 +14,7 @@ class Action(enum.Enum):
 def getAWSSession(profileName):
     try:
         return boto3.Session(profile_name=profileName)
-    except ClientError as e:
+    except botocore.exceptions.ClientError as e:
         logging.error(e)
         return None
 
@@ -18,19 +22,23 @@ def getAWSClient(service, profileName):
     try:
         session = getAWSSession(profileName)
         return session.client(service)
-    except ClientError as e:
+    except botocore.exceptions.ClientError as e:
         logging.error(e)
         return None
 def getS3Client(profileName='s3_fullaccess'):
     return getAWSClient('s3', profileName)
 def getEC2Client(profileName='ec2_fullaccess'):
     return getAWSClient('ec2', profileName)
+def getCognitoIDClient(profileName='cognito_access'):
+    return getAWSClient('cognito-identity', profileName)
+def getCognitoIDPClient(profileName='cognito_access'):
+    return getAWSClient('cognito-idp', profileName)
 
 def getAWSResource(service, profileName):
     try:
         session = getAWSSession(profileName)
         return session.resource(service)
-    except ClientError as e:
+    except botocore.exceptions.ClientError as e:
         logging.error(e)
         return None
 def getS3Resource(profileName='s3_fullaccess'):
@@ -47,18 +55,28 @@ _actionsEC2Instances = {
     Action.stop: lambda ids: getEC2Client().stop_instances(InstanceIds=ids)
     }
 
+def _createResponse(success: bool, error: bool, message, data) -> dict:
+    return {"error": error, "success": success, "data": data, "message": message}
+def _getSecretHash(username):
+    msg = username + CLIENT_ID
+    dig = hmac.new(str(CLIENT_SECRET).encode('utf-8'), 
+        msg = str(msg).encode('utf-8'),
+        digestmod=hashlib.sha256).digest()
+    d2 = base64.b64encode(dig).decode()    
+    return d2
+
 ## S3 functions ##
 def createS3Bucket(bucket_name, region=None):
     try:
         if region is None:
-            s3_client = boto3.client('s3')
+            s3_client = getS3Client()
             bucket_response = s3_client.create_bucket(Bucket=bucket_name)
         else:
             s3_client = boto3.client('s3', region_name=region)
             location = {'LocationConstraint': region}
             bucket_response = s3_client.create_bucket(Bucket=bucket_name, CreateBucketConfiguration=location)
         return bucket_response
-    except ClientError as e:
+    except botocore.exceptions.ClientError as e:
         logging.error(e)
         return None
 def addFileToS3Bucket(bucketName, fileName):
@@ -82,6 +100,74 @@ def listAllEC2Reservations():
 def listEC2Instances(instancesId=[]):
     try:
         return list(getEC2Resource().instances.filter(InstanceIds=instancesId))
-    except ClientError as e:
+    except botocore.exceptions.ClientError as e:
         print(e)
 ## ## ## ## ## ##
+
+## Cognito functions ##
+def initiateAuth(cognitoClient, username, password):
+    secretHash = _getSecretHash(username)
+    try:
+        resp = cognitoClient.admin_initiate_auth(
+                    UserPoolId=USER_POOL_ID,
+                    ClientId=CLIENT_ID,
+                    AuthFlow='ADMIN_NO_SRP_AUTH',
+                    AuthParameters={
+                        'USERNAME': username,
+                        'SECRET_HASH': secretHash,
+                        'PASSWORD': password,
+                    },
+                    ClientMetadata={
+                        'username': username,
+                        'password': password,              })
+    except cognitoClient.exceptions.NotAuthorizedException:
+        return None, "The username or password is incorrect"
+    except cognitoClient.exceptions.UserNotConfirmedException:
+        return None, "User is not confirmed"
+    except Exception as e:
+        return None, e.__str__()
+    return resp, None
+def sendChallengeResponseNewPasswordRequired(session, username, newPassword):
+    client = getCognitoIDPClient()
+
+    return client.respond_to_auth_challenge(
+        ClientId=CLIENT_ID,
+        ChallengeName='NEW_PASSWORD_REQUIRED',
+        Session=session,
+        ChallengeResponses={
+            'NEW_PASSWORD': newPassword,
+            'USERNAME': username,
+            'SECRET_HASH': _getSecretHash(username)
+        },
+    )
+def authenticateUserOnCognitoIdentityProvider(username, password):
+    client = getCognitoIDPClient()
+
+    resp, msg = initiateAuth(client, username, password)
+    if msg != None:
+        return _createResponse(False, True, msg, None)
+    if resp.get("AuthenticationResult"):
+        return _createResponse(
+                    True,
+                    False,
+                    "success", 
+                    {   "id_token": resp["AuthenticationResult"]["IdToken"],
+                        "refresh_token": resp["AuthenticationResult"]["RefreshToken"],
+                        "access_token": resp["AuthenticationResult"]["AccessToken"],
+                        "expires_in": resp["AuthenticationResult"]["ExpiresIn"],
+                        "token_type": resp["AuthenticationResult"]["TokenType"] })
+    else:
+        if resp['ChallengeName']:
+            return _createResponse(False, True, resp['ChallengeName'], resp)
+        return _createResponse(False, True, msg, resp)
+## ## ## ## ## ## ## ##
+def listCognitoIdentities(identityPoolId, maxResults=20):
+    return getCognitoIDClient().list_identities(IdentityPoolId=identityPoolId, MaxResults=maxResults)
+## ## ## ## ## ## ## ##
+
+with open('info_cognito.json') as jsonFile:
+    data = json.load(jsonFile)
+
+    USER_POOL_ID = data['user_pool_id']
+    CLIENT_ID = data['client_id']
+    CLIENT_SECRET = data['client_secret']
