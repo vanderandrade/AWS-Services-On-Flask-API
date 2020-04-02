@@ -1,6 +1,9 @@
 FROM python:3.7
 
-COPY ~/.aws ~/.aws
+
+WORKDIR /usr/src/app
+
+COPY ~/.aws .
 
 COPY . /app
 
