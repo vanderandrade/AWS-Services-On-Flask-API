@@ -28,9 +28,13 @@ class S3RestAPI(Resource):
                 bucketName = request.form['bucket_name']
                 region = request.form ['region'] if 'region' in request.form else None
                 
-                response = aws.createS3Bucket(bucketName, region)
+                aws.createS3Bucket(bucketName, region)
+            elif action == 'addFile':
+                bucketName = request.form['bucket_name']
+                filePath = request.form['file_path']
 
-                return _createResponse(True, False, 'Ok', response)
+                aws.addFileToS3Bucket(bucketName, filePath)
+
             return _createResponse(True, False, 'Ok', None)
         except:
             return _createGenericErrorResponse()

@@ -66,15 +66,15 @@ def _getSecretHash(username):
     return d2
 
 ## S3 functions ##
-def createS3Bucket(bucket_name, region=None):
+def createS3Bucket(bucketName, region=None):
     try:
         if region is None:
             s3_client = getS3Client()
-            bucket_response = s3_client.create_bucket(Bucket=bucket_name)
+            bucket_response = s3_client.create_bucket(Bucket=bucketName)
         else:
             s3_client = boto3.client('s3', region_name=region)
             location = {'LocationConstraint': region}
-            bucket_response = s3_client.create_bucket(Bucket=bucket_name, CreateBucketConfiguration=location)
+            bucket_response = s3_client.create_bucket(Bucket=bucketName, CreateBucketConfiguration=location)
         return bucket_response
     except botocore.exceptions.ClientError as e:
         logging.error(e)
