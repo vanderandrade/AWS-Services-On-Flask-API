@@ -13,5 +13,5 @@ print(f'Turn off EC2 machine: {_response2}')
 # # # # # # # # # # # # # # # # # # #
 bucket_name = ''
 _response3 = post(f'http://{host}:{port}/s3/createBucket/', data={'bucket_name': bucket_name}).json()
-print(f'Turn off EC2 machine: {_response3}')
+print(f'Creating bucket: {_response3}')
 # # # # # # # # # # # # # # # # # # #

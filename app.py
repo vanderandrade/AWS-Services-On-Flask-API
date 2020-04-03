@@ -6,36 +6,44 @@ import aws
 app = Flask(__name__)
 api = Api(app)
 
+def _createResponse(success: bool, error: bool, message, data) -> dict:
+    return {"error": error, "success": success, "data": data, "message": message}
+def _createGenericErrorResponse() -> dict:
+    return _createResponse(False, True, 'Not ok', None)
+
 class S3RestAPI(Resource):
     def get(self, action: str):
         try:
             print(request.url)
             if action == 'getAllBuckets':
-                return [bucket['Name'] for bucket in aws.listAllS3Buckets()]
-            return 'Action not found!'
+                bucketsNames = [bucket['Name'] for bucket in aws.listAllS3Buckets()]
+                return _createResponse(True, False, 'Success', bucketsNames)
+            return _createResponse(False, True, 'Action not found!', None)
         except:
-            return 'Not ok'
+            return _createGenericErrorResponse()
         
     def post(self, action: str):
         try:
             if action == 'createBucket':
                 bucketName = request.form['bucket_name']
                 region = request.form ['region'] if 'region' in request.form else None
-                aws.createS3Bucket(bucketName, region)
-            
-            return 'Ok'
+                
+                response = aws.createS3Bucket(bucketName, region)
+
+                return _createResponse(True, False, 'Ok', response)
+            return _createResponse(True, False, 'Ok', None)
         except:
-            return 'Not ok'
+            return _createGenericErrorResponse()
 
 class EC2RestAPI(Resource):
-    def post(self, action: str, payload=None):
+    def post(self, action: str):
         try:
             aws.turnEC2Instances(aws.Action[action], [request.form['instance_id']])
-            return 'Ok'
+            return _createResponse(True, False, 'Ok', None)
         except:
-            return {'Error':'Not ok'}
+            return _createGenericErrorResponse()
 
-api.add_resource(EC2RestAPI, '/ec2/<string:action>/', methods=['POST']) # methods=['GET', 'POST']
+api.add_resource(EC2RestAPI, '/ec2/<string:action>/', methods=['POST'])
 api.add_resource(S3RestAPI, '/s3/<string:action>/', methods=['GET', 'POST'])
 
 if __name__ == '__main__':
