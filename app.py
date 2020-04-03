@@ -7,7 +7,7 @@ app = Flask(__name__)
 api = Api(app)
 
 def _createResponse(success: bool, error: bool, message, data) -> dict:
-    return {"error": error, "success": success, "data": data, "message": message}
+    return {"success": success, "error": error, "data": data, "message": message}
 def _createGenericErrorResponse() -> dict:
     return _createResponse(False, True, 'Not ok', None)
 
@@ -29,11 +29,22 @@ class S3RestAPI(Resource):
                 region = request.form ['region'] if 'region' in request.form else None
                 
                 aws.createS3Bucket(bucketName, region)
+            elif action == 'deleteBucket':
+                bucketName = request.form['bucket_name']
+                
+                response = aws.deleteSafeS3Bucket(bucketName)
+
+                print(response)
             elif action == 'addFile':
                 bucketName = request.form['bucket_name']
                 filePath = request.form['file_path']
 
                 aws.addFileToS3Bucket(bucketName, filePath)
+            elif action == 'deleteFile':
+                bucketName = request.form['bucket_name']
+                fileName = request.form['file_name']
+
+                aws.removeFileOnS3Bucket(bucketName, fileName)
 
             return _createResponse(True, False, 'Ok', None)
         except:

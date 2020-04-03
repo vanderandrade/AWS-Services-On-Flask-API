@@ -79,9 +79,24 @@ def createS3Bucket(bucketName, region=None):
     except botocore.exceptions.ClientError as e:
         logging.error(e)
         return None
+def deleteSafeS3Bucket(bucketName):
+    try:
+        s3Client = getS3Client()
+        response = s3Client.delete_bucket(Bucket=bucketName)
+        return response
+    except Exception as e:
+        logging.error(e)
+        return 'Error: Bucket not deleted'
 def addFileToS3Bucket(bucketName, fileName):
     s3Resource = getS3Resource()
     s3Resource.Object(bucketName, fileName).upload_file(Filename=fileName)
+def removeFileOnS3Bucket(bucketName, fileName):
+    s3Client = getS3Client()
+    response = s3Client.delete_object(
+        Bucket=bucketName,
+        Key=fileName
+    )
+    return response
 def listAllS3Buckets():
     s3Client = getS3Client()
     response = s3Client.list_buckets()
