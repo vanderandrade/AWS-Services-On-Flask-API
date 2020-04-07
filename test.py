@@ -36,6 +36,16 @@ def test_deleteFileOnBucket(bucketName, fileName):
     response = post(f'http://{host}:{port}/s3/deleteFile/', data={'bucket_name': bucketName, 'file_name' : fileName}).json()
     print(f'removing file on bucket: {response}')
 
+def test_createSQSQueue(queueName, isFifo='false'):
+    response = post(f'http://{host}:{port}/sqs/create/', data={'name': queueName, 'fifo' : isFifo}).json()
+    print(f'creating queue: {response}')
+
+def test_sendMessageToSQSQueue(queueName, message):
+    response = post(f'http://{host}:{port}/sqs/sendMessage/', data={'queue_name': queueName, 'message' : message}).json()
+    print(f'sending message: {response}')
 
 #test_createBucket(bucket_name)
-test_safeDeleteBucket(bucket_name)
+#test_safeDeleteBucket(bucket_name)
+
+#test_createSQSQueue('test-queue', 'false')
+test_sendMessageToSQSQueue('initial-queue', 'second message')

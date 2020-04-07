@@ -11,6 +11,20 @@ def _createResponse(success: bool, error: bool, message, data) -> dict:
 def _createGenericErrorResponse() -> dict:
     return _createResponse(False, True, 'Not ok', None)
 
+class SQSRestAPI(Resource):
+    def post(self, action):
+        try:
+            if action == 'create':
+                response = aws.createSQSQueue(request.form['name'], request.form['fifo'])
+                return _createResponse(True, False, 'Ok', response['QueueUrl'])
+            elif action == 'sendMessage':
+                response = aws.sendMessageToSQSQueue(request.form['queue_name'], request.form['message'])
+                return _createResponse(True, False, 'Ok', response)
+            return _createResponse(True, False, 'Ok', None)
+        except Exception as e:
+            print(e)
+            return _createGenericErrorResponse()
+
 class S3RestAPI(Resource):
     def get(self, action: str):
         try:
@@ -26,7 +40,7 @@ class S3RestAPI(Resource):
         try:
             if action == 'createBucket':
                 bucketName = request.form['bucket_name']
-                region = request.form ['region'] if 'region' in request.form else None
+                region = request.form['region'] if 'region' in request.form else None
                 
                 aws.createS3Bucket(bucketName, region)
             elif action == 'deleteBucket':
@@ -59,6 +73,7 @@ class EC2RestAPI(Resource):
             return _createGenericErrorResponse()
 
 api.add_resource(EC2RestAPI, '/ec2/<string:action>/', methods=['POST'])
+api.add_resource(SQSRestAPI, '/sqs/<string:action>/', methods=['POST'])
 api.add_resource(S3RestAPI, '/s3/<string:action>/', methods=['GET', 'POST'])
 
 if __name__ == '__main__':

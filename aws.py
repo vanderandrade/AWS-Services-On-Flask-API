@@ -18,6 +18,8 @@ def getAWSSession(profileName):
         logging.error(e)
         return None
 
+def getAWSUnauthorizedClient(service, region):
+    return boto3.client(service, region_name=region)
 def getAWSClient(service, profileName):
     try:
         session = getAWSSession(profileName)
@@ -33,6 +35,8 @@ def getCognitoIDClient(profileName='cognito_access'):
     return getAWSClient('cognito-identity', profileName)
 def getCognitoIDPClient(profileName='cognito_access'):
     return getAWSClient('cognito-idp', profileName)
+def getSQSClient(profileName='sqs_fullaccess'):
+    return getAWSClient('sqs', profileName)
 
 def getAWSResource(service, profileName):
     try:
@@ -56,7 +60,7 @@ _actionsEC2Instances = {
     }
 
 def _createResponse(success: bool, error: bool, message, data) -> dict:
-    return {"error": error, "success": success, "data": data, "message": message}
+    return {"success": success, "error": error, "data": data, "message": message}
 def _getSecretHash(username):
     msg = username + CLIENT_ID
     dig = hmac.new(str(CLIENT_SECRET).encode('utf-8'), 
@@ -118,6 +122,28 @@ def listEC2Instances(instancesId=[]):
     except botocore.exceptions.ClientError as e:
         print(e)
 ## ## ## ## ## ##
+
+## SQS functions ##
+def createSQSQueue(queueName: str, fifoQueue = 'false'):
+    try:
+        if fifoQueue == 'false':
+            return getSQSClient().create_queue(QueueName=queueName)
+        return getSQSClient().create_queue(QueueName=queueName, Attributes={'FifoQueue': fifoQueue})
+    except Exception as e:
+        print(e)
+        raise e
+def getSQSQueueUrl(queueName):
+    return getSQSClient().get_queue_url(QueueName=queueName).get('QueueUrl')
+def sendMessageToSQSQueue(queueName: str, message: str, delaySeconds=5):
+    try:
+        sqs_client = getSQSClient()
+        queueUrl = getSQSQueueUrl(queueName)
+        response = sqs_client.send_message(QueueUrl=queueUrl, MessageBody=message, DelaySeconds=delaySeconds)
+
+        return response['MessageId']
+    except Exception as e:
+        raise e
+## ## ## ## ## ## ##
 
 ## Cognito functions ##
 def initiateAuth(cognitoClient, username, password):
