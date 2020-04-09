@@ -35,6 +35,8 @@ def getCognitoIDClient(profileName='cognito_access'):
     return getAWSClient('cognito-identity', profileName)
 def getCognitoIDPClient(profileName='cognito_access'):
     return getAWSClient('cognito-idp', profileName)
+def getIAMClient(profileName='iam_access'):
+    return getAWSClient('iam', profileName)
 def getSQSClient(profileName='sqs_fullaccess'):
     return getAWSClient('sqs', profileName)
 
@@ -49,6 +51,8 @@ def getS3Resource(profileName='s3_fullaccess'):
     return getAWSResource('s3', profileName)
 def getEC2Resource(profileName='ec2_fullaccess'):
     return getAWSResource('ec2', profileName)
+def getIAMResource(profileName='iam_access'):
+    return getAWSResource('iam', profileName)
 
 _actionsEC2Monitoring = {
     Action.start: lambda ids: getEC2Client().monitor_instances(InstanceIds=ids),
@@ -68,6 +72,30 @@ def _getSecretHash(username):
         digestmod=hashlib.sha256).digest()
     d2 = base64.b64encode(dig).decode()    
     return d2
+
+## IAM functions ##
+def createIAMRole(roleName: str, rolePolicy, path:str=None):
+    if path is None:
+        path = '/'
+
+    client = getIAMClient()
+    return client.create_role(
+        Path=path,
+        RoleName=roleName,
+        AssumeRolePolicyDocument=json.dumps(rolePolicy)
+    )
+def attachPoliciesToIAMRole(roleName: str, policies:list):
+    try:
+        iam = getIAMResource()
+        role = iam.Role(roleName)
+
+        for policy in policies:
+            role.attach_policy(PolicyArn=policy)
+        return True
+    except Exception as e:
+        print(e)
+        raise e
+## ## ## ## ## ## ##
 
 ## S3 functions ##
 def createS3Bucket(bucketName, region=None):

@@ -8,10 +8,35 @@ api = Api(app)
 
 def _createResponse(success: bool, error: bool, message, data) -> dict:
     return {"success": success, "error": error, "data": data, "message": message}
-def _createGenericErrorResponse(e) -> dict:
-    return _createResponse(False, True, 'Not ok', e)
+def _createGenericErrorResponse(error=None) -> dict:
+    return _createResponse(False, True, 'Not ok', error)
 
-class SQSRestAPI(Resource):
+class IAM_RestAPI(Resource):
+    def get(self, action):
+        pass
+
+    def post(self, action):
+        try:
+            if action == 'createRole':
+                role_name = request.form['role_name']
+                role_policy = request.form['role_policy']
+                role_path = request.form['role_path'] if 'role_path' in request.form else None
+
+                response = aws.createIAMRole(role_name, role_policy, role_path)
+                return _createResponse(True, False, 'Ok', response)
+            elif action == 'attachPoliciesToRole':
+                role_name = request.form['role_name']
+                role_policies = request.form['role_policies']
+
+                response = aws.attachPoliciesToIAMRole(role_name, role_policies)
+                return _createResponse(True, False, 'Ok', response)
+            return _createResponse(True, False, 'Ok', None)
+        except Exception as e:
+            print(e)
+            return _createGenericErrorResponse(e)
+
+
+class SQS_RestAPI(Resource):
     def post(self, action):
         try:
             if action == 'create':
@@ -23,9 +48,9 @@ class SQSRestAPI(Resource):
             return _createResponse(True, False, 'Ok', None)
         except Exception as e:
             print(e)
-            return _createGenericErrorResponse()
+            return _createGenericErrorResponse(e)
 
-class S3RestAPI(Resource):
+class S3_RestAPI(Resource):
     def get(self, action: str):
         try:
             print(request.url)
@@ -70,7 +95,7 @@ class S3RestAPI(Resource):
         except Exception as e:
             return _createGenericErrorResponse(e)
 
-class EC2RestAPI(Resource):
+class EC2_RestAPI(Resource):
     def post(self, action: str):
         try:
             aws.turnEC2Instances(aws.Action[action], [request.form['instance_id']])
@@ -78,9 +103,10 @@ class EC2RestAPI(Resource):
         except:
             return _createGenericErrorResponse()
 
-api.add_resource(EC2RestAPI, '/ec2/<string:action>/', methods=['POST'])
-api.add_resource(SQSRestAPI, '/sqs/<string:action>/', methods=['POST'])
-api.add_resource(S3RestAPI, '/s3/<string:action>/', methods=['GET', 'POST'])
+api.add_resource(EC2_RestAPI, '/ec2/<string:action>/', methods=['POST'])
+api.add_resource(IAM_RestAPI, '/iam/<string:action>/', methods=['POST'])
+api.add_resource(SQS_RestAPI, '/sqs/<string:action>/', methods=['POST'])
+api.add_resource(S3_RestAPI, '/s3/<string:action>/', methods=['GET', 'POST'])
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port='3000')
