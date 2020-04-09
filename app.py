@@ -8,8 +8,8 @@ api = Api(app)
 
 def _createResponse(success: bool, error: bool, message, data) -> dict:
     return {"success": success, "error": error, "data": data, "message": message}
-def _createGenericErrorResponse() -> dict:
-    return _createResponse(False, True, 'Not ok', None)
+def _createGenericErrorResponse(e) -> dict:
+    return _createResponse(False, True, 'Not ok', e)
 
 class SQSRestAPI(Resource):
     def post(self, action):
@@ -58,11 +58,17 @@ class S3RestAPI(Resource):
                 bucketName = request.form['bucket_name']
                 fileName = request.form['file_name']
 
-                aws.removeFileOnS3Bucket(bucketName, fileName)
+                response = aws.removeFileOnS3Bucket(bucketName, fileName)
+                return _createResponse(True, False, 'Ok', response)
+            elif action == 'setPolicy':
+                bucketName = request.form['bucket_name']
+                bucketPolicy = request.form['bucket_policy']
 
+                response = aws.setS3BucketPolicy(bucketName, bucketPolicy)
+                return _createResponse(True, False, 'Ok', response)
             return _createResponse(True, False, 'Ok', None)
-        except:
-            return _createGenericErrorResponse()
+        except Exception as e:
+            return _createGenericErrorResponse(e)
 
 class EC2RestAPI(Resource):
     def post(self, action: str):

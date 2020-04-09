@@ -91,6 +91,16 @@ def deleteSafeS3Bucket(bucketName):
     except Exception as e:
         logging.error(e)
         return 'Error: Bucket not deleted'
+def setS3BucketPolicy(bucketName, bucketPolicy):
+    try:
+        s3Client = getS3Client()
+
+        policy = json.dumps(bucketPolicy)
+        response = s3Client.put_bucket_policy(Bucket=bucketName, Policy=policy)
+        return response
+    except Exception as e:
+        print(e)
+        raise e
 def addFileToS3Bucket(bucketName, fileName):
     s3Resource = getS3Resource()
     s3Resource.Object(bucketName, fileName).upload_file(Filename=fileName)
